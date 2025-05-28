@@ -1,155 +1,90 @@
-##🌾 AgroScan AI – Smart Crop Monitoring & Disease Detection
+# AgroScanAI - Plant Disease Detection
 
-AgroScan AI is a vision-based AI system that helps farmers detect crop diseases and plant anomalies using images. Built for accessibility and real-world deployment, AgroScan focuses on clear, actionable insights with a streamlined UI for non-technical users.
+## Project Setup
 
----
-
-## 🚀 Phase 1: Disease Detection for Single Plants (Internship Scope)
-
-### 🎯 Objective
-Classify crop diseases in **single plant images** with visual explanations using deep learning. Deploy a minimal, user-friendly web app for farmers and agronomists.
-
----
-
-## 🧠 Core Features
-
-- ✅ **Crop Disease Classification** (MobileNetV2)
-- ✅ **Visual Explanation with Grad-CAM** (Explainable AI)
-- ✅ **Lightweight & Deployable via Streamlit**
-- ✅ **MLflow for Experiment Tracking**
-- ✅ **DVC for Dataset and Pipeline Versioning**
-
----
-
-## 🔍 Sample Use Case
-
-1. Farmer clicks a photo of a leaf or plant.
-2. App predicts if it's healthy or diseased.
-3. Visual overlay shows area of concern (e.g., leaf blight).
-4. Simple suggestion/label is shown in regional language (future work).
-
----
-
-## 🧱 Tech Stack
-
-| Component           | Tool/Framework       |
-|--------------------|----------------------|
-| Classification     | MobileNetV2          |
-| Explainability     | Grad-CAM              |
-| UI                 | Streamlit            |
-| Model Tracking     | MLflow                |
-| Version Control    | Git + DVC             |
-| Deployment         | Docker (Planned)      |
-
----
-
-## 🖼️ System Architecture – Phase 1
-
-```mermaid
-flowchart TD
-    User["User (Farmer)"]
-    Upload["Upload Plant Image"]
-    Classify["Disease Classification (MobileNetV2)"]
-    GradCAM["Grad-CAM Heatmap"]
-    Output["Prediction + Visual Explanation"]
-    
-    User --> Upload --> Classify --> GradCAM --> Output
-````
-
----
-
-## 📂 Directory Structure
-
-```
-agroscan-ai/
-├── data/                 # Datasets (via DVC)
-├── models/               # Saved model checkpoints
-├── src/
-│   ├── preprocessing.py  # Image preprocessing
-│   ├── classify.py       # Classification logic
-│   └── explain.py        # Grad-CAM visualization
-├── app/
-│   └── streamlit_app.py  # Streamlit UI
-├── mlruns/               # MLflow experiments
-├── dvc.yaml              # Pipeline tracking
-└── README.md
-```
-
----
-
-## 📊 Model Evaluation
-
-| Metric    | Value |
-| --------- | ----- |
-| Accuracy  | 92.3% |
-| Precision | 90.8% |
-| Recall    | 91.4% |
-| F1-score  | 91.1% |
-| Classes   | 10    |
-
----
-
-## ⚙️ How to Run Locally
-
+### 1. Environment Setup
 ```bash
-# Clone Repo
-git clone https://github.com/hreger/agroscan-ai
-cd agroscan-ai
+# Create and activate virtual environment (optional)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+.\venv\Scripts\activate  # Windows
 
-# Install Dependencies
+# Install dependencies
 pip install -r requirements.txt
+```
 
-# Run Streamlit App
+### 2. Data Setup
+1. Download the PlantVillage dataset
+2. Place the dataset in `data/PlantVillage/` directory
+3. Initialize DVC and track the dataset:
+```bash
+# Initialize DVC (already done)
+python -m dvc init
+
+# Track the dataset
+python -m dvc add data/PlantVillage
+
+# Set up remote storage (optional)
+python -m dvc remote add -d storage gdrive://<your-gdrive-folder-id>
+```
+
+### 3. DVC Pipeline
+The project uses DVC to manage the data pipeline:
+
+1. Data Preprocessing:
+```bash
+# Run preprocessing stage
+python -m dvc repro preprocess
+```
+
+2. Model Training:
+```bash
+# Run training stage
+python -m dvc repro train
+```
+
+### 4. Model Evaluation
+```bash
+# Run evaluation script
+python -m app.evaluate
+```
+
+### 5. Streamlit App
+```bash
+# Run the web interface
 streamlit run app/streamlit_app.py
 ```
 
----
-
-## 🧪 Experiment Tracking (MLflow)
-
-Launch MLflow UI:
-
-```bash
-mlflow ui
+## Project Structure
+```
+.
+├── app/                    # Application code
+│   ├── data_loader.py     # Data loading utilities
+│   ├── evaluate.py        # Model evaluation
+│   ├── gradcam.py         # Model interpretation
+│   ├── model_builder.py   # Model architecture
+│   ├── preprocess_data.py # Data preprocessing
+│   └── streamlit_app.py   # Web interface
+├── data/                  # Data directory
+│   ├── PlantVillage/      # Raw dataset
+│   └── processed_PlantVillage/ # Processed dataset
+├── models/                # Model checkpoints
+├── dvc.yaml              # DVC pipeline configuration
+├── params.yaml           # Training parameters
+└── requirements.txt      # Project dependencies
 ```
 
-View results at: `http://localhost:5000`
+## DVC Pipeline Stages
+1. **Preprocess**: Resizes and normalizes images to 128x128
+2. **Train**: Trains MobileNetV2 model with transfer learning
 
----
+## Model Architecture
+- Base: MobileNetV2
+- Input: 128x128x3 RGB images
+- Output: Plant disease classification
 
-## 🗃️ Dataset
-
-* ✅ [PlantVillage Dataset](https://www.kaggle.com/datasets/emmarex/plantdisease)
-* ✅ Augmented for lighting & rotation variance
-
----
-
-## 🔐 Future Enhancements (Post-Internship)
-
-| Feature                     | Description                                |
-| --------------------------- | ------------------------------------------ |
-| 🧠 Multi-plant Segmentation | YOLOv8-seg or Mask-RCNN for field images   |
-| 📱 Mobile Deployment        | TensorRT/ONNX optimization + Flask backend |
-| 🔄 Real-time Feedback       | Stream processing for video/camera input   |
-| 🔒 User Security            | JWT auth + farmer login                    |
-| 📡 Cloud Integration        | AWS Lambda/EC2 or GCP Functions            |
-
----
-
-## 🌱 Project Vision
-
-To empower farmers with an AI-powered mobile solution that delivers **actionable health diagnostics**, **farming advice**, and **resource optimization insights** using **explainable, field-tuned deep learning models**.
-
----
-
-## 👩‍💻 Contributors
-
-* P Sanjeev Pradeep
-* Open to collaborations!
-
----
-
-## 📄 License
-
-MIT License. Free to use, modify, and build upon with credits.
+## Performance Tracking
+- MLflow for experiment tracking
+- DVC for data and pipeline versioning
+- Model metrics and artifacts stored in `metrics/`
 

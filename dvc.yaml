@@ -1,0 +1,28 @@
+stages:
+  preprocess:
+    cmd: python -m app.preprocess_data
+    deps:
+      - data/PlantVillage
+      - app/preprocess_data.py
+    outs:
+      - data/processed_PlantVillage
+    metrics:
+      - metrics/preprocessing.json:
+          cache: false
+
+  train:
+    cmd: python train.py
+    deps:
+      - data/processed_PlantVillage
+      - app/model_builder.py
+      - app/data_loader.py
+      - train.py
+    params:
+      - epochs
+      - batch_size
+      - learning_rate
+    outs:
+      - models/latest_model.h5
+    metrics:
+      - metrics/training.json:
+          cache: false
