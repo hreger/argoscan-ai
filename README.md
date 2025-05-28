@@ -1,4 +1,4 @@
-#🌾 AgroScan AI – Smart Crop Monitoring & Disease Detection
+##🌾 AgroScan AI – Smart Crop Monitoring & Disease Detection
 
 AgroScan AI is a vision-based AI system that helps farmers detect crop diseases and plant anomalies using images. Built for accessibility and real-world deployment, AgroScan focuses on clear, actionable insights with a streamlined UI for non-technical users.
 
