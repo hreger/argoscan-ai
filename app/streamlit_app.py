@@ -1,149 +1,156 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
+from pathlib import Path
 from PIL import Image
-import io
-import os
-from tensorflow.keras.models import load_model
-from gradcam import generate_gradcam_visualization, preprocess_image
-from data_loader import get_dataset_info, load_plantvillage_dataset
+import tensorflow as tf
+from typing import Tuple
 
-# Set page config
-st.set_page_config(
-    page_title="AgroScanAI - Plant Disease Detection",
-    page_icon="🌿",
-    layout="wide"
-)
+from .predict import PlantDiseasePredictor
+from .explain import GradCAMExplainer
+from .data_loader import preprocess_image
 
-def load_model_and_classes():
-    """Load the trained model and class names."""
-    model_path = os.path.join('models', 'latest_model.h5')
-    model = load_model(model_path)
+# Constants
+MODEL_PATH = Path('models/latest_model.h5')
+CLASS_NAMES = [  # TODO: Load from a config file
+    'Tomato_Bacterial_spot',
+    'Tomato_Early_blight',
+    'Tomato_Late_blight',
+    'Tomato_Leaf_Mold',
+    'Tomato_Septoria_leaf_spot',
+    'Tomato_Spider_mites_Two_spotted_spider_mite',
+    'Tomato_Target_Spot',
+    'Tomato_Tomato_Yellow_Leaf_Curl_Virus',
+    'Tomato_Tomato_mosaic_virus',
+    'Tomato_healthy'
+]
+
+def load_image(image_file: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Load and preprocess image for prediction.
     
-    # Get class names
-    _, val_dataset = load_plantvillage_dataset(
-        data_dir=os.path.join('data', 'PlantVillage'),
-        img_size=(128, 128),
-        batch_size=32,
-        validation_split=0.2
-    )
-    class_names = get_dataset_info(val_dataset)['class_names']
+    Args:
+        image_file: Uploaded image file
+        
+    Returns:
+        Tuple of original image array and preprocessed image array
+    """
+    # Read image
+    image = Image.open(image_file)
+    image_array = np.array(image)
     
-    return model, class_names
-
-def get_disease_description(class_name):
-    """Return a description and treatment recommendation for the disease."""
-    # This could be expanded with a proper database of disease information
-    return {
-        'description': f"Detected {class_name}. This is a common plant disease that affects crop health and yield.",
-        'treatment': "General recommendations:\n" + \
-                    "1. Remove affected leaves\n" + \
-                    "2. Improve air circulation\n" + \
-                    "3. Apply appropriate fungicide if necessary\n" + \
-                    "4. Monitor plant health regularly"
-    }
+    # Preprocess for model
+    preprocessed = preprocess_image(image_file)
+    
+    return image_array, preprocessed
 
 def main():
+    st.set_page_config(
+        page_title="AgroScanAI - Plant Disease Detection",
+        page_icon="🌿",
+        layout="wide"
+    )
+    
     # Add custom CSS
     st.markdown("""
         <style>
         .main {max-width: 1200px; margin: 0 auto; padding: 2rem;}
         .stTitle {color: #2e7d32;}
         .upload-box {border: 2px dashed #2e7d32; padding: 2rem; text-align: center;}
+        .prediction-box {background-color: #f0f7f0; padding: 1.5rem; border-radius: 0.5rem; margin: 1rem 0;}
+        .confidence-bar {height: 20px; background: linear-gradient(to right, #e8f5e9, #2e7d32); border-radius: 10px;}
         </style>
     """, unsafe_allow_html=True)
     
-    # Header
-    st.title('🌿 AgroScanAI - Plant Disease Detection')
-    st.markdown('''
-        Upload a photo of a plant leaf to detect diseases and get treatment recommendations.
-        Our AI model will analyze the image and provide detailed insights.
-    ''')
+    st.title("🌿 AgroScanAI - Plant Disease Detection")
+    st.write("""
+    Upload an image of a plant leaf to detect diseases and get detailed explanations.
+    Our AI model will analyze the image and provide insights about plant health.
+    """)
     
-    # Load model and classes
+    # Initialize predictor and explainer
     try:
-        model, class_names = load_model_and_classes()
+        model = tf.keras.models.load_model(MODEL_PATH)
+        predictor = PlantDiseasePredictor(str(MODEL_PATH), CLASS_NAMES)
+        explainer = GradCAMExplainer(model)
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
         return
-    
-    # File upload
+            
+    # File uploader
     uploaded_file = st.file_uploader(
-        "Choose a leaf image...",
+        "Choose an image...",
         type=['jpg', 'jpeg', 'png'],
-        help="Upload a clear image of a single leaf"
+        help="Upload a clear image of a single leaf for analysis"
     )
     
     if uploaded_file is not None:
         try:
-            # Create columns for layout
-            col1, col2 = st.columns(2)
+            # Create three columns for layout
+            col1, col2, col3 = st.columns(3)
             
             # Display original image
             with col1:
-                st.subheader("Uploaded Image")
-                image = Image.open(uploaded_file)
-                st.image(image, use_column_width=True)
-                
-                # Save temporary file for Grad-CAM
-                temp_path = os.path.join('models', 'temp_image.jpg')
-                image.save(temp_path)
+                st.subheader("Original Image")
+                image_array, preprocessed = load_image(uploaded_file)
+                st.image(image_array, use_column_width=True)
             
-            # Process image and make prediction
-            img_array, _ = preprocess_image(temp_path)
-            prediction = model.predict(img_array)
-            pred_class_idx = np.argmax(prediction[0])
-            confidence = prediction[0][pred_class_idx]
-            predicted_class = class_names[pred_class_idx]
+            # Make prediction and display results
+            prediction, confidence, class_probs = predictor.predict_image(preprocessed)
             
-            # Get disease information
-            disease_info = get_disease_description(predicted_class)
-            
-            # Display prediction results
             with col2:
-                st.subheader("Analysis Results")
+                st.subheader("Diagnosis Results")
                 
-                # Create a styled box for the prediction
+                # Display prediction in styled box
                 st.markdown(f"""
-                    <div style='padding: 1rem; border-radius: 0.5rem; background-color: #f0f7f0;'>
-                        <h3 style='color: #2e7d32;'>Diagnosis</h3>
-                        <p><strong>Detected Condition:</strong> {predicted_class}</p>
-                        <p><strong>Confidence:</strong> {confidence:.2%}</p>
+                    <div class='prediction-box'>
+                        <h3 style='color: #2e7d32; margin-top: 0;'>Detected Condition</h3>
+                        <p style='font-size: 1.2rem; font-weight: bold;'>{prediction.replace('_', ' ')}</p>
+                        <p>Confidence: {confidence:.1%}</p>
+                        <div class='confidence-bar' style='width: {confidence*100}%'></div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Display disease information
-                st.markdown("### Description")
-                st.write(disease_info['description'])
+                # Disease information
+                disease_info = predictor.get_disease_info(prediction)
+                with st.expander("Disease Information", expanded=True):
+                    st.write(f"**Description:** {disease_info['description']}")
+                    st.write(f"**Symptoms:** {disease_info['symptoms']}")
+                    st.write(f"**Treatment:** {disease_info['treatment']}")
+                    st.write(f"**Prevention:** {disease_info['prevention']}")
                 
-                st.markdown("### Treatment Recommendations")
-                st.write(disease_info['treatment'])
+                # Show all predictions
+                with st.expander("All Predictions"):
+                    for class_name, prob in class_probs.items():
+                        st.write(f"{class_name.replace('_', ' ')}: {prob:.1%}")
             
             # Generate and display Grad-CAM visualization
-            st.subheader("Model Interpretation (Grad-CAM)")
-            gradcam_path = os.path.join('models', 'gradcam_output.png')
-            generate_gradcam_visualization(
-                temp_path,
-                os.path.join('models', 'latest_model.h5'),
-                class_names,
-                gradcam_path
-            )
-            st.image(gradcam_path, use_column_width=True)
-            
-            # Cleanup temporary files
-            os.remove(temp_path)
-            os.remove(gradcam_path)
-            
+            with col3:
+                st.subheader("Model Explanation")
+                class_idx = CLASS_NAMES.index(prediction)
+                _, heatmap, overlay = explainer.explain_prediction(uploaded_file, class_idx)
+                st.image(overlay, caption="Grad-CAM Visualization", use_column_width=True)
+                st.write("""
+                The highlighted regions show which parts of the image were most important
+                for the model's prediction. Warmer colors (red) indicate stronger influence
+                on the diagnosis.
+                """)
+        
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
     
-    # Add information about the project
+    # Project information
     st.markdown("---")
     st.markdown("""
-        ### About AgroScanAI
-        This tool uses deep learning to detect plant diseases from leaf images.
-        The model has been trained on the PlantVillage dataset and uses Grad-CAM
-        for visualization of important regions in the image that influenced the prediction.
+    ### About AgroScanAI
+    
+    This tool uses advanced deep learning to detect plant diseases from leaf images.
+    Features:
+    - Accurate disease detection for tomato plants
+    - Confidence scores for predictions
+    - Visual explanations using Grad-CAM
+    - Detailed disease information and treatment recommendations
+    
+    The model has been trained on the PlantVillage dataset and uses state-of-the-art
+    techniques for both prediction and visualization.
     """)
 
 if __name__ == "__main__":
